@@ -9,6 +9,7 @@
 #include <QDir>
 #include <QSettings>
 #include <QFileDialog>
+#include <iostream>
 
 class ImageLibrary : public QMainWindow
 {
@@ -22,17 +23,22 @@ public:
     ImageLibrary(QWidget *parent = nullptr);
     ~ImageLibrary();
     void go();
+
+public slots:
+    void addItem (const QString &);
 };
 
 class Worker : public QObject
 {
     Q_OBJECT
 private:
-    QStringList path;
+    QString path;
 public:
-    Worker();
+    Worker(const QString &);
     ~Worker();
-    process();
+    void process();
+signals:
+    void newItem(QString);
 };
 
 #endif // IMAGELIBRARY_H
