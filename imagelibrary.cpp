@@ -5,6 +5,9 @@
 #include <QDir>
 #include <QFileInfo>
 #include <iostream>
+#include <QThread>
+#include <QtConcurrent>
+#include <QFuture>
 #include "imagelibrary.h"
 
 
@@ -41,24 +44,42 @@ void ImageLibrary::go()
 
 
     //Création d'une instance de worker
-    Worker work(dir);
+    //Worker work(dir);
 
     //Connexion du signal à addItem
-    QObject::connect(&work, &Worker::newItem,
-                     this, &ImageLibrary::addItem);
+    //connect(&work, &Worker::newItem,
+     //       this, &ImageLibrary::addItem);
 
     //Déclenchement de worker
-    work.process();
+    //work.process();
+
+
+    /*QThread * thread = new QThread;
+    Worker * worker = new Worker (dir);
+    worker->moveToThread (thread);
+    connect (thread, &QThread::started, worker, &Worker::process);
+    connect (worker, &Worker::finished, thread, &QThread::quit);
+    connect (worker, &Worker::finished, worker, &Worker::deleteLater);
+    connect (thread, &QThread::finished, thread, &QThread::deleteLater);
+    thread->start ();
+    connect(worker, &Worker::newItem, this, &ImageLibrary::addItem);
+    */
+    //QtConcurrent::run(worker, &Worker::process);
+
+    QtConcurrent::run([=](){
+        Worker worker(dir);
+        connect(&worker, &Worker::newItem, this, &ImageLibrary::addItem);
+        worker.process();
+    });
 
 }
 
 
 
-Worker::Worker(const QString &path) : QObject()
+Worker::Worker(const QString &path) : QObject(),path(path)
 {
-    this->path = path;
-}
 
+}
 
 Worker::~Worker()
 {
@@ -71,8 +92,6 @@ void Worker::process()
     QStringList wait;
     wait << this->path;
 
-    QDir dir(this->path);
-
     // Edition des filtres
     QStringList filters;
     filters << "*.png" << "*.jpg" << "*.jpeg";
@@ -81,33 +100,33 @@ void Worker::process()
     //Boucle de traitement
     while(!wait.isEmpty())
     {
-      QString jsp = wait.takeFirst();
+      QString premierElement = wait.takeFirst();
 
-      //std::cout << jsp.toStdString() << std::endl;
+      //std::cout << premierElement.toStdString() << std::endl;
 
-      QFileInfo info(jsp);
+      QFileInfo info(path,premierElement);
 
       if(info.isDir())
       {
-          QDir dir(jsp);
+          QDir dir(info.absoluteFilePath());
 
           QFileInfoList fileInfos = dir.entryInfoList(filters, QDir::NoDotAndDotDot | QDir::AllDirs | QDir::Files);
 
-          //for(const QFileInfo &i: fileInfos)
+          //for(const QFileInfo &i: fileInfos) est une autre posibilité
           for (int i=0; i < fileInfos.size();i++)
           {
               wait << fileInfos[i].absoluteFilePath();
-              //std::cout << fileInfos[i].absoluteFilePath().toStdString() << std::endl;
+              std::cout << fileInfos[i].absoluteFilePath().toStdString() << std::endl;
           }
 
 
        }
       else
       {
+          //std::cout << info.absoluteFilePath().toStdString() << std::endl;
           emit newItem(info.absoluteFilePath());
       }
     }
-
 
 }
 

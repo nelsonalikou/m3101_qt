@@ -9,6 +9,8 @@
 #include <QDir>
 #include <QSettings>
 #include <QFileDialog>
+#include <QThread>
+#include <QtConcurrent>
 #include <iostream>
 
 class ImageLibrary : public QMainWindow
@@ -38,7 +40,8 @@ public:
     ~Worker();
     void process();
 signals:
-    void newItem(QString);
+    void newItem(const QString &);
+    void finished();
 };
 
 #endif // IMAGELIBRARY_H
