@@ -18,16 +18,16 @@
 // Classe Item
 class Item
 {
-private:
+public:
     QString path;
     QImage thumbnail;
 public:
-    Item(const QString &, const QImage &);
+    Item(const QString & = QString(), const QImage & = QImage());
     ~Item();
 };
 
 
-
+//Classe Model
 class Model : public QAbstractListModel
 {
     Q_OBJECT
@@ -44,12 +44,13 @@ public slots:
     void setThumbnail (int, const QImage &);
 };
 
+
 // Classe Image Library
 class ImageLibrary : public QMainWindow
 {
     Q_OBJECT
 private:
-    QStringListModel model;
+    Model model;
     QListView view;
     QToolBar toolbar;
 
@@ -59,7 +60,7 @@ public:
     void go();
 
 public slots:
-    void addItem (const QString &);
+    //void addItem (const QString &);
 };
 
 
@@ -73,13 +74,15 @@ private:
 public:
     Worker(const QString &);
     ~Worker();
-    void process();
     static Item MappedItem(const QString & path);
     void processItem(int);
     static QImage Thumbnail(const QString &);
 
+public slots:
+    void process();
+
 signals:
-    void newItem(const QString &);
+    void newItem(const QString &, const QImage &);
     void finished();
     void newThumbnail(int, const QImage &);
 

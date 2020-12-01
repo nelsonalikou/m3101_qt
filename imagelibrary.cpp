@@ -22,6 +22,8 @@ ImageLibrary::ImageLibrary(QWidget *parent)
     addToolBar(&toolbar);
 
     this->view.setViewMode(QListView::IconMode);
+    this->view.setResizeMode(QListView::Adjust);
+    this->view.setUniformItemSizes(true);
     this->view.setGridSize(QSize (THUMBNAIL_SIZE, THUMBNAIL_SIZE));
     setCentralWidget(&view);
 
@@ -48,13 +50,9 @@ void ImageLibrary::go()
         settings.setValue("start",dir);
         QMessageBox::information(this, "Info","Success");
 
-
-        QThread * thread = new QThread;
-         //Worker worker(dir);
-        Worker * worker = new Worker (dir);
-        worker->moveToThread (thread);
-
-
+        QThread* thread = new QThread;
+        Worker* worker = new Worker(dir);
+        worker->moveToThread(thread);
 
         connect(worker, &Worker::newItem, &model, &Model::addItem);
 
@@ -62,12 +60,13 @@ void ImageLibrary::go()
         connect (worker, &Worker::finished, thread, &QThread::quit);
         connect (worker, &Worker::finished, worker, &Worker::deleteLater);
         connect (thread, &QThread::finished, thread, &QThread::deleteLater);
-        thread->start ();
 
-        connect(worker, &Worker::newThumbnail, &model, &Model::setThumbnail);
-        worker->process();
+        connect(worker, &Worker::newThumbnail , &model , &Model::setThumbnail );
+
+        thread->start();
 
         settings.setValue("lastDir", dir);
+
     }
 
 
@@ -82,11 +81,12 @@ void ImageLibrary::go()
     //work.process();
 
 
-    QtConcurrent::run([=](){
+    /*QtConcurrent::run([=](){
         Worker worker(dir);
         connect(&worker, &Worker::newItem, this, &ImageLibrary::addItem);
         worker.process();
     });
+    */
 
 }
 
@@ -144,7 +144,7 @@ void Worker::process()
           for (int i=0; i < fileInfos.size();i++)
           {
               wait << fileInfos[i].absoluteFilePath();
-              std::cout << fileInfos[i].absoluteFilePath().toStdString() << std::endl;
+              //std::cout << fileInfos[i].absoluteFilePath().toStdString() << std::endl;
           }
 
 
@@ -152,18 +152,19 @@ void Worker::process()
       else
       {
           //std::cout << info.absoluteFilePath().toStdString() << std::endl;
-          emit newItem(info.absoluteFilePath());
+          //QImage image(info.absoluteFilePath());
+          emit newItem(info.absoluteFilePath(),QImage());
           paths << info.absoluteFilePath();
       }
     }
-    connect(&this->watcher, &QFutureWatcher<Item>::finished, this, &Worker::finished);
+    connect(&watcher, &QFutureWatcher<Item>::finished, this, &Worker::finished);
     connect(&watcher, &QFutureWatcher<Item>::resultReadyAt, this, &Worker::processItem);
-    watcher.setFuture( QtConcurrent::mapped(path, Worker::MappedItem));
+    watcher.setFuture( QtConcurrent::mapped(paths, Worker::MappedItem));
 
 }
 
 
-//Fonction de création de la miniature das le worker
+//Fonction de création de la miniature dans le worker
 QImage Worker::Thumbnail(const QString & path)
 {
     QImage img (path);
@@ -174,14 +175,13 @@ QImage Worker::Thumbnail(const QString & path)
 Item Worker::MappedItem(const QString & path)
 {
     //std::cout << "MappedItem " << path.toStdString() << std::endl;
-    Item item(path, Worker::Thumbnail(path));
-    return item;
+    return Item(path, Worker::Thumbnail(path));
 }
 
 
 void Worker::processItem(int k)
 {
-    std::cout << "processItem " << k << std::endl;
+    //std::cout << "processItem " << k << std::endl;
     emit newThumbnail( k, watcher.resultAt(k).thumbnail);
 }
 
@@ -214,25 +214,35 @@ Model::~Model()
 
 int Model::rowCount(const QModelIndex &index) const
 {
-    /*int row = 0;
-    if (index.isValid())
-    {
-        row = index.row();
-    }
-    return row;*/
     return this->items.size();
 }
 
 
 QVariant Model::data(const QModelIndex &index, int role) const{
-    return index.data(role);
+    int k = index.row();
+    switch (role) {
+        case Qt::ToolTipRole :
+            return items[k].path;
+        case Qt::DecorationRole :
+            return items[k].thumbnail;
+        default:
+            return QVariant() ;
+    }
 }
 
 
 void Model::addItem(const QString &path, const QImage &thumbnail)
 {
     Item item (path,thumbnail);
-    beginInsertRows(QModelIndex (), rowCount(), rowCount());
+    beginInsertRows(QModelIndex(), rowCount(), rowCount());
     this->items << item;
     endInsertRows();
+}
+
+
+void Model::setThumbnail(int k, const QImage &thumbnail)
+{
+    items[k].thumbnail = thumbnail;
+    //std::cout << "setThumbnail " << k << std::endl;
+    emit dataChanged(index(k),index(k),{Qt::DecorationRole});
 }
